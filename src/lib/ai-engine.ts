@@ -136,6 +136,9 @@ RULES:
 6. Column Selection: Always select human-friendly business columns like emp_code, emp_name, department_name, designation_title, dates, and amounts.
    EXCEPTION: When querying payslips (gs_payslip_actual), ALWAYS include 'p.actual_payslip_id', 'p.employee_id', and 'p.payslip_month' along with 'e.emp_name', 'p.total_gross_monthly', and 'p.net_payable', so the application can construct direct links to the official PDF generator ('newpayslip.php?m={month}&y={year}&emp_ID={employee_id}').
 7. Payslip & PDF Knowledge: The hospital system generates official employee payslip PDFs via 'newpayslip.php?m={month}&y={year}&emp_ID={employee_id}'. When the user asks for payslips, payslip PDFs, or salary slips (e.g. "can i get last month payslip pdf?", "payslip pdf", "payslip of vinothini"), query gs_payslip_actual joined with gs_employee.
+8. Attendance Knowledge: For queries about who is present or today's attendance:
+   - An employee is PRESENT if: ((a.checkin_time IS NOT NULL AND a.checkin_time != '00:00:00') OR a.attendance_status IN (1, 2, 6)). Never filter ONLY attendance_status = 1, as live punches on the current day have checkin_time populated while attendance_status may be 0 before the end-of-day cron runs.
+   - For 'today' queries, use CURDATE(), but fallback to (SELECT MAX(attendance_checkin_date) FROM gs_daily_actual_attendance WHERE (deleted = 0 OR deleted IS NULL)) if CURDATE() has no records yet.
 ZENRO SCHEMA:
 ${ZENRO_SCHEMA_DESCRIPTION}
 

@@ -30,14 +30,14 @@ Your task:
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: `${prompt}\n\nInput speech: ${clean}\nNormalized text:` }] }],
-            generationConfig: { temperature: 0.1, maxOutputTokens: 250 },
+            generationConfig: { temperature: 0.1, maxOutputTokens: 2500 },
           }),
         }
       );
       if (res.ok) {
         const data = await res.json();
         const output = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-        if (output) return output;
+        if (output && output.length >= Math.floor(clean.length * 0.7)) return output;
       }
     } catch {}
   }
@@ -58,13 +58,13 @@ Your task:
             { role: 'user', content: clean },
           ],
           temperature: 0.1,
-          max_tokens: 200,
+          max_tokens: 2500,
         }),
       });
 
       const data = await res.json();
       const output = data.choices?.[0]?.message?.content?.trim();
-      if (output) return output;
+      if (output && output.length >= Math.floor(clean.length * 0.7)) return output;
     } catch {}
   }
 
@@ -84,13 +84,13 @@ Your task:
             { role: 'user', content: clean },
           ],
           temperature: 0.1,
-          max_tokens: 200,
+          max_tokens: 2500,
         }),
       });
 
       const data = await res.json();
       const output = data.choices?.[0]?.message?.content?.trim();
-      if (output) return output;
+      if (output && output.length >= Math.floor(clean.length * 0.7)) return output;
     } catch {}
   }
 
@@ -119,11 +119,18 @@ export async function POST(req: NextRequest) {
     const geminiModel = process.env.GOOGLE_MODEL || 'gemini-3.8-flash';
 
     if (!googleKey || googleKey.startsWith('YOUR_')) {
+      const fallbackResult = await runFallbackTranscription(buffer, cleanMime, language);
+      if (fallbackResult) {
+        return NextResponse.json({
+          success: true,
+          provider: 'groq-whisper',
+          text: fallbackResult,
+        });
+      }
       return NextResponse.json(
         {
           success: false,
-          error:
-            'GOOGLE_API_KEY is not configured in .env.local. Gemini API is the dedicated transcription engine.',
+          error: 'GOOGLE_API_KEY is not configured and Groq Whisper fallback could not process audio.',
           provider: 'gemini',
         },
         { status: 500 }
@@ -178,7 +185,7 @@ CRITICAL RULES:
             ],
             generationConfig: {
               temperature: 0.1,
-              maxOutputTokens: 1000,
+              maxOutputTokens: 2500,
             },
           }),
         }
@@ -194,76 +201,50 @@ CRITICAL RULES:
             success: true,
             provider: 'gemini',
             model: geminiModel,
-            text: polished,
+            text: polished || transcribed,
           });
         }
       }
 
-      // Handle Gemini API error responses
-      if (geminiData.error) {
-        const errMessage = geminiData.error.message || JSON.stringify(geminiData.error);
-        console.warn(`Gemini API (${geminiModel}) error:`, errMessage);
-
-        const isLeaked =
-          geminiData.error.code === 403 ||
-          errMessage.toLowerCase().includes('leaked') ||
-          errMessage.toLowerCase().includes('permission_denied');
-
-        if (isLeaked) {
-          // If emergency fallback is permitted in env, provide it while warning
-          if (process.env.ALLOW_AUDIO_FALLBACK === 'true') {
-            const fallbackResult = await runFallbackTranscription(buffer, cleanMime, language);
-            if (fallbackResult) {
-              return NextResponse.json({
-                success: true,
-                provider: 'groq-whisper-fallback',
-                text: fallbackResult,
-                warning: 'Gemini API key was reported as leaked; fallback transcription was used.',
-              });
-            }
-          }
-
-          return NextResponse.json(
-            {
-              success: false,
-              error:
-                'Google Gemini API Error (403): Your GOOGLE_API_KEY was reported as leaked by Google. Please obtain a fresh API key from https://aistudio.google.com/app/apikey and update GOOGLE_API_KEY in your .env.local file.',
-              provider: 'gemini',
-              model: geminiModel,
-            },
-            { status: 403 }
-          );
-        }
-
-        return NextResponse.json(
-          {
-            success: false,
-            error: `Gemini API Error: ${errMessage}`,
-            provider: 'gemini',
-            model: geminiModel,
-          },
-          { status: geminiRes.status || 500 }
-        );
+      // If Gemini returned an error or empty result, auto-fallback to Groq Whisper
+      console.warn('Gemini transcription unsuccessful, automatically falling back to Groq Whisper:', geminiData?.error?.message || 'Empty candidate');
+      const fallbackResult = await runFallbackTranscription(buffer, cleanMime, language);
+      if (fallbackResult) {
+        return NextResponse.json({
+          success: true,
+          provider: 'groq-whisper',
+          text: fallbackResult,
+        });
       }
-    } catch (geminiErr: any) {
-      console.warn('Gemini transcription request failed:', geminiErr.message);
+
       return NextResponse.json(
         {
           success: false,
-          error: `Gemini transcription request failed: ${geminiErr.message}`,
+          error: geminiData?.error?.message || 'Could not transcribe audio using Gemini or fallback.',
+          provider: 'gemini',
+        },
+        { status: geminiRes.status || 500 }
+      );
+    } catch (geminiErr: any) {
+      console.warn('Gemini transcription request threw exception, falling back to Groq Whisper:', geminiErr.message);
+      const fallbackResult = await runFallbackTranscription(buffer, cleanMime, language);
+      if (fallbackResult) {
+        return NextResponse.json({
+          success: true,
+          provider: 'groq-whisper',
+          text: fallbackResult,
+        });
+      }
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Transcription failed: ${geminiErr.message}`,
           provider: 'gemini',
         },
         { status: 500 }
       );
     }
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: `Could not transcribe audio using Google Gemini (${geminiModel}).`,
-      },
-      { status: 500 }
-    );
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }

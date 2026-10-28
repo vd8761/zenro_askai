@@ -4,13 +4,47 @@
  * Contains all 61 non-_old tables, every field with exact data type, nullability, key, and indexes.
  */
 
-export const ZENRO_SCHEMA_DESCRIPTION = `DATABASE ENGINE: MySQL (shc_2026)
+export const ZENRO_SCHEMA_DESCRIPTION = `DATABASE ENGINE: MySQL (shc_2026 / zenro_touchmark)
 TOTAL TABLES (non-_old): 61
 ALL CORE TABLES USE "gs_" PREFIX
-CONVENTIONS:
+CONVENTIONS & VERIFIED BUSINESS LOGIC (Extracted from MySQL SHOW FULL COLUMNS Comments):
   - Soft deletes: Column \`deleted\` (0 = Active, 1 = Soft Deleted). ALWAYS check \`(table.deleted = 0 OR table.deleted IS NULL)\`
   - Status: Column \`status\` (1 = Active / Approved, 0 = Inactive / Draft)
-  - Never assume column names. Refer exclusively to the definitions below.
+
+  1. DAILY ATTENDANCE RULES (gs_daily_actual_attendance):
+     * attendance_status: 1 = Full Day | 2 = Half Day | 3 = Absent | 4 = Week Off | 5 = Holiday | 6 = On Duty
+     * CRITICAL RULE FOR PRESENT EMPLOYEES:
+       When employees punch in during the workday, checkin_time is recorded immediately (e.g. '09:25:00').
+       Before the end-of-day cron job runs, attendance_status may be 0, 1, 2, or 6.
+       THEREFORE: An employee is PRESENT if ((a.checkin_time IS NOT NULL AND a.checkin_time != '00:00:00') OR a.attendance_status IN (1, 2, 6)).
+       An employee is ABSENT if (a.attendance_status = 3 OR ((a.checkin_time IS NULL OR a.checkin_time = '00:00:00') AND a.attendance_status NOT IN (1, 2, 4, 5, 6))).
+     * DATE HANDLING: For "today" queries:
+       Use COALESCE to check CURDATE(), but if no punches exist for CURDATE() yet, fall back to MAX(attendance_checkin_date).
+     * lop_status: 0 = Loss of Pay | 1 = Approved leaves
+     * emp_day_status: 0 = Working Day | 1 = Holiday | 2 = Week off | 3 = Leave | 4 = Half Day | 5 = On Duty | 6 = N/A (Unpaid Days)
+     * entry_type: 1 = Mobile App | 2 = Bulk upload | 3 = Form Submission | 4 = Cron | 5 = Holiday Updation
+
+  2. EMPLOYEE STATUS (gs_employee):
+     * emp_status: 1 = New Joined | 2 = Regular/Provisional | 3 = Regular/Confirmed | 4 = Suspension | 5 = Long Absent | 6 = Resigned | 7 = Terminated
+     * Active employees: (e.deleted = 0 OR e.deleted IS NULL) AND e.emp_status IN (1, 2, 3)
+
+  3. LEAVES (gs_employee_leave_debits):
+     * leave_type: 1 = Casual Leave (CL) | 2 = Sick Leave (SL) | 3 = Earned Leave (EL) | 4 = Compensatory Leave (CML) | 5 = Maternity Leave | 7 = Menstrual Leave
+     * leave_status: 1 = New | 2 = Pending | 3 = Approved | 4 = Reject | 5 = Auto Reject | 6 = Canceled by Employee
+     * leave_day: 1 = Full Day | 2 = First half day | 3 = Second half day
+
+  4. HOURLY PERMISSIONS (gs_employee_hourly_leave_permission_debits):
+     * permission_status: 1 = New/Pending | 2 = Approved | 3 = Reject | 4 = Cancelled by Employee
+     * permission_type: 1 = Fixed count | 2 = Fixed hours
+
+  5. LOANS & ADVANCES (gs_employee_loan & gs_employee_advance_payment):
+     * loan status: 1 = Open | 2 = Closed (total_loan_due > 0 is active balance)
+     * advance payment status: 0 = Not Deducted in Payslip | 1 = Deducted in Payslip
+
+  6. PAYSLIP CALCULATIONS (gs_payslip_actual):
+     * total_paid_days = (WEEK OFF DAYS + HOLIDAYS + PRESENT DAYS + LEAVE APPROVED DAYS)
+     * total_working_days = NO OF DAYS IN A MONTH - (WEEK OFF DAYS + HOLIDAYS)
+     * payroll_component_type: 1 = Earnings | 2 = Deductions | 3 = Reimbursement | 4 = Benefits
 
 =============================================================================
 1. api_log_request_type_list (PK: gs_api_log_request_type_ID, Columns: 7)
@@ -1728,19 +1762,55 @@ WHERE (deleted = 0 OR deleted IS NULL) AND status = 1
 ORDER BY holiday_date ASC;`,
   },
   {
-    question: 'Show today or recent daily attendance records',
+    question: 'Who is present today? / யார் யார் இன்று வந்துள்ளார்கள்? / யார் பிரசன்ட்? / Show today present employees',
     sql: `SELECT e.emp_code, e.emp_name, d.department_name,
        a.attendance_checkin_date AS date,
        a.checkin_time, a.checkout_time,
-       a.total_work_duration, a.total_overtime,
-       CASE a.attendance_status WHEN 1 THEN 'Present' ELSE 'Absent' END AS status,
-       CASE a.lop_status WHEN 1 THEN 'LOP' ELSE 'Normal' END AS lop
+       a.total_work_duration,
+       CASE
+         WHEN a.attendance_status = 1 THEN 'Full Day'
+         WHEN a.attendance_status = 2 THEN 'Half Day'
+         WHEN a.attendance_status = 6 THEN 'On Duty'
+         WHEN a.checkin_time IS NOT NULL AND a.checkin_time != '00:00:00' THEN 'Checked In (Present)'
+         ELSE 'Present'
+       END AS attendance_status_label
 FROM gs_daily_actual_attendance a
 JOIN gs_employee e ON a.employee_id = e.employee_ID
 LEFT JOIN gs_department d ON e.emp_department = d.department_id
 WHERE (a.deleted = 0 OR a.deleted IS NULL)
-ORDER BY a.attendance_checkin_date DESC, e.emp_name ASC
-LIMIT 30;`,
+  AND a.attendance_checkin_date = (
+    CASE 
+      WHEN EXISTS (SELECT 1 FROM gs_daily_actual_attendance WHERE attendance_checkin_date = CURDATE() AND (deleted = 0 OR deleted IS NULL))
+      THEN CURDATE()
+      ELSE (SELECT MAX(attendance_checkin_date) FROM gs_daily_actual_attendance WHERE (deleted = 0 OR deleted IS NULL))
+    END
+  )
+  AND ((a.checkin_time IS NOT NULL AND a.checkin_time != '00:00:00') OR a.attendance_status IN (1, 2, 6))
+ORDER BY a.checkin_time ASC, e.emp_name ASC;`,
+  },
+  {
+    question: 'Who is absent today? / யார் யார் ஆப்சன்ட்? / Show absent employees today',
+    sql: `SELECT e.emp_code, e.emp_name, d.department_name,
+       CURDATE() AS date,
+       'Absent' AS status
+FROM gs_employee e
+LEFT JOIN gs_department d ON e.emp_department = d.department_id
+WHERE (e.deleted = 0 OR e.deleted IS NULL)
+  AND e.emp_status IN (1, 2, 3)
+  AND e.employee_ID NOT IN (
+    SELECT a.employee_id
+    FROM gs_daily_actual_attendance a
+    WHERE (a.deleted = 0 OR a.deleted IS NULL)
+      AND a.attendance_checkin_date = (
+        CASE 
+          WHEN EXISTS (SELECT 1 FROM gs_daily_actual_attendance WHERE attendance_checkin_date = CURDATE() AND (deleted = 0 OR deleted IS NULL))
+          THEN CURDATE()
+          ELSE (SELECT MAX(attendance_checkin_date) FROM gs_daily_actual_attendance WHERE (deleted = 0 OR deleted IS NULL))
+        END
+      )
+      AND ((a.checkin_time IS NOT NULL AND a.checkin_time != '00:00:00') OR a.attendance_status IN (1, 2, 6))
+  )
+ORDER BY e.emp_name ASC;`,
   },
   {
     question: 'can i get last month payslip pdf? / Show last month payslips',
