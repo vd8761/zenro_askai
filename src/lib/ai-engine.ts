@@ -139,6 +139,10 @@ RULES:
 8. Attendance Knowledge: For queries about who is present or today's attendance:
    - An employee is PRESENT if: ((a.checkin_time IS NOT NULL AND a.checkin_time != '00:00:00') OR a.attendance_status IN (1, 2, 6)). Never filter ONLY attendance_status = 1, as live punches on the current day have checkin_time populated while attendance_status may be 0 before the end-of-day cron runs.
    - For 'today' queries, use CURDATE(), but fallback to (SELECT MAX(attendance_checkin_date) FROM gs_daily_actual_attendance WHERE (deleted = 0 OR deleted IS NULL)) if CURDATE() has no records yet.
+9. Shift Assignment Knowledge: For queries about shifts, today's assigned shift details, or roster:
+   - ALWAYS return shift business columns: \`COALESCE(sd.shift_title, 'General Shift') AS shift_name\`, \`COALESCE(TIME_FORMAT(sd.shift_start_time, '%h:%i %p'), '09:30 AM') AS shift_start_time\`, \`COALESCE(TIME_FORMAT(sd.shift_end_time, '%h:%i %p'), '06:30 PM') AS shift_end_time\`, \`COALESCE(sd.total_working_hours, 8.00) AS shift_hours\`.
+   - NEVER select salary, fixed gross, or gender when the user specifically asks for shift information. Ensure query results strictly answer the user's intent.
+   - Join gs_shift_schedule ss and gs_shift_details sd on ss.month_of_shift = MONTHNAME(CURDATE()) and ss.year_of_shift = YEAR(CURDATE()), mapping DAY(CURDATE()) to ss.day_X.
 ZENRO SCHEMA:
 ${ZENRO_SCHEMA_DESCRIPTION}
 
@@ -295,8 +299,13 @@ async function synthesizeAnswer(
   if (execResult.rows && execResult.rows.length > 0) {
     const keys = Object.keys(execResult.rows[0]);
 
-    // Check for payroll / salary totals
-    const salaryKey = keys.find(k => /monthly_gross|salary|ctc|net_payable|total_monthly_payroll|net_pay/i.test(k));
+    const isNonFinancialQuery = /shift|attendance|leave|holiday|roster|present|absent|punch/i.test(query);
+
+    // Check for payroll / salary totals only when query is financial
+    const salaryKey = !isNonFinancialQuery
+      ? keys.find(k => /monthly_gross|salary|ctc|net_payable|total_monthly_payroll|net_pay/i.test(k))
+      : null;
+
     if (salaryKey) {
       const total = execResult.rows.reduce((sum, r) => sum + (Number(r[salaryKey]) || 0), 0);
       const avg = total / execResult.rows.length;
@@ -311,10 +320,20 @@ async function synthesizeAnswer(
         value: `₹${Math.round(avg).toLocaleString('en-IN')}`,
         type: 'currency',
       });
+    } else if (/shift/i.test(query)) {
+      const shiftKey = keys.find(k => /shift_name|shift_title/i.test(k));
+      if (shiftKey) {
+        const uniqueShifts = new Set(execResult.rows.map(r => r[shiftKey])).size;
+        metrics.push({
+          label: 'Active Shift Types',
+          value: uniqueShifts,
+          type: 'number',
+        });
+      }
     }
 
     metrics.push({
-      label: 'Verified Records',
+      label: /shift/i.test(query) ? 'Assigned Employees' : 'Verified Records',
       value: execResult.rowCount,
       type: 'number',
     });

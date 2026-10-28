@@ -215,6 +215,18 @@ export default function DataTable({ columns, rows, title }: DataTableProps) {
       return <span className="code-badge">{String(val)}</span>;
     }
 
+    // Gender mapping
+    if (colLower.includes('gender')) {
+      const g = Number(val);
+      const label = g === 1 ? 'Male' : g === 2 ? 'Female' : g === 3 ? 'Other' : String(val);
+      return <span className="text-cell">{label}</span>;
+    }
+
+    // Shift name styling
+    if (colLower.includes('shift') && typeof val === 'string') {
+      return <span className="code-badge" style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>{val}</span>;
+    }
+
     if (typeof val === 'number') {
       return <span className="number-cell">{val.toLocaleString()}</span>;
     }

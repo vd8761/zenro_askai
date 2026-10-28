@@ -1743,14 +1743,54 @@ ORDER BY p.payslip_month DESC, e.emp_name ASC, cd.payroll_component_type ASC
 LIMIT 30;`,
   },
   {
-    question: 'Show monthly shift schedule assignments',
-    sql: `SELECT e.emp_code, e.emp_name, ss.month_of_shift, ss.year_of_shift,
-       ss.day_1, ss.day_2, ss.day_3, ss.day_4, ss.day_5, ss.day_6, ss.day_7
-FROM gs_shift_schedule ss
-JOIN gs_employee e ON ss.employee_id = e.employee_ID
-WHERE (ss.deleted = 0 OR ss.deleted IS NULL)
-ORDER BY ss.year_of_shift DESC, ss.month_of_shift DESC
-LIMIT 20;`,
+    question: 'today assigned shift details with employee? / which employee is in which shift today? / இன்றைய ஷிப்ட் விவரங்கள் / Show today employee shifts',
+    sql: `SELECT e.emp_code, e.emp_name, d.department_name, ds.designation_title,
+       COALESCE(sd.shift_title, 'General Shift') AS shift_name,
+       COALESCE(TIME_FORMAT(sd.shift_start_time, '%h:%i %p'), '09:30 AM') AS shift_start_time,
+       COALESCE(TIME_FORMAT(sd.shift_end_time, '%h:%i %p'), '06:30 PM') AS shift_end_time,
+       COALESCE(sd.total_working_hours, 8.00) AS shift_hours
+FROM gs_employee e
+LEFT JOIN gs_department d ON e.emp_department = d.department_id
+LEFT JOIN gs_designation ds ON e.emp_designation = ds.designation_id
+LEFT JOIN gs_shift_schedule ss ON e.employee_ID = ss.employee_id 
+  AND ss.month_of_shift = MONTHNAME(CURDATE()) 
+  AND ss.year_of_shift = YEAR(CURDATE())
+  AND (ss.deleted = 0 OR ss.deleted IS NULL)
+LEFT JOIN gs_shift_details sd ON (
+  sd.shift_id = CASE DAY(CURDATE())
+    WHEN 1 THEN ss.day_1 WHEN 2 THEN ss.day_2 WHEN 3 THEN ss.day_3 WHEN 4 THEN ss.day_4
+    WHEN 5 THEN ss.day_5 WHEN 6 THEN ss.day_6 WHEN 7 THEN ss.day_7 WHEN 8 THEN ss.day_8
+    WHEN 9 THEN ss.day_9 WHEN 10 THEN ss.day_10 WHEN 11 THEN ss.day_11 WHEN 12 THEN ss.day_12
+    WHEN 13 THEN ss.day_13 WHEN 14 THEN ss.day_14 WHEN 15 THEN ss.day_15 WHEN 16 THEN ss.day_16
+    WHEN 17 THEN ss.day_17 WHEN 18 THEN ss.day_18 WHEN 19 THEN ss.day_19 WHEN 20 THEN ss.day_20
+    WHEN 21 THEN ss.day_21 WHEN 22 THEN ss.day_22 WHEN 23 THEN ss.day_23 WHEN 24 THEN ss.day_24
+    WHEN 25 THEN ss.day_25 WHEN 26 THEN ss.day_26 WHEN 27 THEN ss.day_27 WHEN 28 THEN ss.day_28
+    WHEN 29 THEN ss.day_29 WHEN 30 THEN ss.day_30 WHEN 31 THEN ss.day_31
+  END
+  OR sd.shift_code = CASE DAY(CURDATE())
+    WHEN 1 THEN ss.day_1 WHEN 2 THEN ss.day_2 WHEN 3 THEN ss.day_3 WHEN 4 THEN ss.day_4
+    WHEN 5 THEN ss.day_5 WHEN 6 THEN ss.day_6 WHEN 7 THEN ss.day_7 WHEN 8 THEN ss.day_8
+    WHEN 9 THEN ss.day_9 WHEN 10 THEN ss.day_10 WHEN 11 THEN ss.day_11 WHEN 12 THEN ss.day_12
+    WHEN 13 THEN ss.day_13 WHEN 14 THEN ss.day_14 WHEN 15 THEN ss.day_15 WHEN 16 THEN ss.day_16
+    WHEN 17 THEN ss.day_17 WHEN 18 THEN ss.day_18 WHEN 19 THEN ss.day_19 WHEN 20 THEN ss.day_20
+    WHEN 21 THEN ss.day_21 WHEN 22 THEN ss.day_22 WHEN 23 THEN ss.day_23 WHEN 24 THEN ss.day_24
+    WHEN 25 THEN ss.day_25 WHEN 26 THEN ss.day_26 WHEN 27 THEN ss.day_27 WHEN 28 THEN ss.day_28
+    WHEN 29 THEN ss.day_29 WHEN 30 THEN ss.day_30 WHEN 31 THEN ss.day_31
+  END
+)
+WHERE (e.deleted = 0 OR e.deleted IS NULL) AND e.emp_status IN (1, 2, 3)
+ORDER BY e.emp_name ASC;`,
+  },
+  {
+    question: 'Show all shift timings and shift master details / என்னென்ன ஷிப்ட் உள்ளது',
+    sql: `SELECT shift_title, shift_code,
+       TIME_FORMAT(shift_start_time, '%h:%i %p') AS start_time,
+       TIME_FORMAT(shift_end_time, '%h:%i %p') AS end_time,
+       total_working_hours, total_break_time,
+       CASE default_shift WHEN 1 THEN 'Yes' ELSE 'No' END AS is_default_shift
+FROM gs_shift_details
+WHERE (deleted = 0 OR deleted IS NULL) AND status = 1
+ORDER BY shift_start_time ASC;`,
   },
   {
     question: 'Show all holidays in the calendar',
