@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="16 32 96 136" fill="none">
+  <defs>
+    <linearGradient id="zenroIconGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6111D1"/>
+      <stop offset="25%" stop-color="#4C34E0"/>
+      <stop offset="60%" stop-color="#335FF2"/>
+      <stop offset="100%" stop-color="#2B6DF8"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#zenroIconGrad)" d="M73.839,65.941c3.555-5.238,10.486-8.606,15.818-11.6L87.878,50.6c-5.332,2.994-12.085,6.735-18.128,6.735H21.409V34.511h88.153v22.824h-0.177l-54.03,76.708c-3.732,5.24-10.485,8.606-15.995,11.415l1.777,3.928c5.51-2.994,12.263-6.736,18.306-6.736h50.119v22.825H19.631v-21.514L73.839,65.941z"/>
+</svg>
