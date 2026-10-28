@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Zenro Ask AI - Shadithya Hospital Payroll",
-  description: "Enterprise AI Payroll and HRMS Assistant for Zenro & Shadithya Hospital with live database execution",
+  title: "Zenro Ask AI - Payroll Copilot",
+  description: "Enterprise AI Payroll and HRMS Copilot for Zenro Payroll with live database execution",
   icons: {
     icon: "/zenrofavicon.png",
     shortcut: "/zenrofavicon.png",

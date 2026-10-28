@@ -426,7 +426,7 @@ export default function ZenroAskAiPage() {
 
   const activeSession = sessions.find(s => s.id === activeSessionId);
   const currentOrgTitle = authState.tenant?.org_title || dbStats?.orgTitle || 'Zenro Payroll';
-  const currentOrgLogo = authState.tenant?.org_logo || dbStats?.orgLogoUrl || '/uploads/site_logo/images.jpg';
+  const currentOrgLogo = authState.tenant?.org_logo || dbStats?.orgLogoUrl || '';
 
   return (
     <div className="zenro-app-layout">
@@ -445,6 +445,8 @@ export default function ZenroAskAiPage() {
         onDeleteSession={handleDeleteSession}
         onRenameSession={handleRenameSession}
         dbStats={dbStats}
+        orgTitle={currentOrgTitle}
+        orgLogo={currentOrgLogo}
         onOpenDbModal={() => setDbModalOpen(true)}
         theme="light"
         onToggleTheme={() => {}}

@@ -12,7 +12,7 @@ interface QuickPromptsProps {
 export default function QuickPrompts({ onSelectPrompt, language, orgTitle }: QuickPromptsProps) {
   const isTamil = language === 'ta' || language?.includes('tamil');
   const isHindi = language === 'hi' || language?.includes('hindi');
-  const displayOrg = orgTitle || 'Shadithya Hospital';
+  const displayOrg = orgTitle || 'Zenro Payroll';
 
   const prompts = isTamil
     ? [

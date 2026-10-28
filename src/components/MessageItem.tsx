@@ -74,7 +74,8 @@ export default function MessageItem({ message, orgLogoUrl, orgTitle }: MessageIt
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `shadithya_hospital_payroll_report_${Date.now()}.md`;
+    const safePrefix = (orgTitle || 'zenro_payroll').toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    a.download = `${safePrefix}_payroll_report_${Date.now()}.md`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -82,33 +83,36 @@ export default function MessageItem({ message, orgLogoUrl, orgTitle }: MessageIt
   };
 
   const isUser = message.role === 'user';
-  const hospitalTitle = orgTitle || 'Shadithya Hospital';
-  const hospitalLogo = orgLogoUrl || '/uploads/site_logo/images.jpg';
+  const displayOrgTitle = orgTitle || 'Zenro Payroll';
+  const displayOrgLogo = orgLogoUrl || '';
+  const senderTitle = orgTitle ? `${orgTitle} Admin` : 'Payroll Admin';
 
   if (isUser) {
     return (
       <div className="message-row user-message-row">
         <div className="message-container">
-          <div className="message-avatar user-avatar" title={`${hospitalTitle} Admin`}>
-            <img
-              src={hospitalLogo}
-              alt={hospitalTitle}
-              className="avatar-logo-img user-logo-img"
-              onError={(e) => {
-                const target = e.currentTarget;
-                target.style.display = 'none';
-                if (target.nextElementSibling) {
-                  (target.nextElementSibling as HTMLElement).style.display = 'flex';
-                }
-              }}
-            />
-            <div className="avatar-fallback user-fallback" style={{ display: 'none' }}>
+          <div className="message-avatar user-avatar" title={senderTitle}>
+            {displayOrgLogo ? (
+              <img
+                src={displayOrgLogo}
+                alt={displayOrgTitle}
+                className="avatar-logo-img user-logo-img"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  target.style.display = 'none';
+                  if (target.nextElementSibling) {
+                    (target.nextElementSibling as HTMLElement).style.display = 'flex';
+                  }
+                }}
+              />
+            ) : null}
+            <div className="avatar-fallback user-fallback" style={{ display: displayOrgLogo ? 'none' : 'flex' }}>
               <User size={16} />
             </div>
           </div>
           <div className="message-content-wrapper">
             <div className="message-header">
-              <span className="sender-name">Hospital Admin</span>
+              <span className="sender-name">{senderTitle}</span>
               {mountedTime && <span className="message-time">{mountedTime}</span>}
             </div>
             <div className="markdown-body">
@@ -161,7 +165,7 @@ export default function MessageItem({ message, orgLogoUrl, orgTitle }: MessageIt
             <DataTable
               columns={message.tabularData.columns}
               rows={message.tabularData.rows}
-              title={`${hospitalTitle} Records`}
+              title={`${displayOrgTitle} Records`}
             />
           )}
 

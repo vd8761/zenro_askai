@@ -271,7 +271,7 @@ export default function ChatInput({
     }
   };
 
-  const displayOrg = orgTitle || 'Shadithya Hospital';
+  const displayOrg = orgTitle || 'Zenro Payroll';
 
   return (
     <div className="chat-input-wrapper">

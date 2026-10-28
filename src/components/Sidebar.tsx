@@ -25,6 +25,8 @@ interface SidebarProps {
   onOpenDbModal: () => void;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
+  orgTitle?: string;
+  orgLogo?: string;
 }
 
 export default function Sidebar({
@@ -38,6 +40,8 @@ export default function Sidebar({
   onRenameSession,
   dbStats,
   onOpenDbModal,
+  orgTitle,
+  orgLogo,
 }: SidebarProps) {
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -249,30 +253,37 @@ export default function Sidebar({
       <div className="sidebar-bottom">
         <div className="sidebar-user-row">
           <div className="sidebar-user-info">
-            <div className="user-avatar-sm" title={dbStats?.orgTitle || 'Shadithya Hospital'}>
-              {dbStats?.orgLogoUrl ? (
-                <img
-                  src={dbStats.orgLogoUrl}
-                  alt={dbStats?.orgTitle || 'Logo'}
-                  className="sidebar-org-logo-img"
-                  onError={(e) => {
-                    const target = e.currentTarget;
-                    target.style.display = 'none';
-                    if (target.parentElement) {
-                      const title = dbStats?.orgTitle || 'Shadithya Hospital';
-                      const initials = title.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || 'SH';
-                      target.parentElement.innerText = initials;
-                    }
-                  }}
-                />
-              ) : (
-                (dbStats?.orgTitle || 'Shadithya Hospital').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || 'SH'
-              )}
-            </div>
-            <div className="user-details-sm">
-              <span className="user-name-sm">{dbStats?.orgTitle || 'Shadithya Hospital'}</span>
-              <span className="user-role-sm">Super Admin</span>
-            </div>
+            {(() => {
+              const displayOrg = orgTitle || dbStats?.orgTitle || 'Zenro Payroll';
+              const displayLogo = orgLogo || dbStats?.orgLogoUrl || '';
+              const initials = displayOrg.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || 'ZP';
+              return (
+                <>
+                  <div className="user-avatar-sm" title={displayOrg}>
+                    {displayLogo ? (
+                      <img
+                        src={displayLogo}
+                        alt={displayOrg}
+                        className="sidebar-org-logo-img"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          target.style.display = 'none';
+                          if (target.parentElement) {
+                            target.parentElement.innerText = initials;
+                          }
+                        }}
+                      />
+                    ) : (
+                      initials
+                    )}
+                  </div>
+                  <div className="user-details-sm">
+                    <span className="user-name-sm">{displayOrg}</span>
+                    <span className="user-role-sm">Super Admin</span>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       </div>

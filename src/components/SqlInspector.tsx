@@ -26,7 +26,7 @@ export default function SqlInspector({ sqlExecution, orgTitle }: SqlInspectorPro
         <div className="sql-inspector-meta">
           <div className="db-badge">
             <Database size={13} className="text-purple" />
-            <span>{orgTitle || 'Shadithya Hospital'}</span>
+            <span>{orgTitle || 'Zenro Payroll'}</span>
           </div>
 
           <div className="latency-badge badge-blue">

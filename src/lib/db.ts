@@ -195,7 +195,7 @@ export async function getDbStats(
       departmentCount = deptResult?.[0]?.count || 0;
     } catch {}
 
-    let orgTitle = 'Shadithya Hospital';
+    let orgTitle = 'Zenro Payroll';
     let orgLogo = '';
     let orgLogoUrl = '';
 

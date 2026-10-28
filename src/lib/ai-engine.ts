@@ -111,11 +111,11 @@ async function getOrganisationName(dbOverride?: { database?: string; host?: stri
       return res.rows[0].gensetting_sitetitle;
     }
   } catch {}
-  return 'Shadithya Hospital';
+  return 'Zenro Payroll';
 }
 
 // Call external LLM (Groq, OpenAI, or Gemini) to generate SQL
-async function generateSqlWithLLM(query: string, history: ChatMessage[], orgName: string = 'Shadithya Hospital'): Promise<string | null> {
+async function generateSqlWithLLM(query: string, history: ChatMessage[], orgName: string = 'Zenro Payroll'): Promise<string | null> {
   const groqKey = process.env.GROQ_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
   const geminiKey = process.env.GOOGLE_API_KEY;
